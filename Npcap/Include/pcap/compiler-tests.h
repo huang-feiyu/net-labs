@@ -43,14 +43,14 @@
  * in some version (which version?); it has been picked up by GCC 5.0.
  */
 #ifndef __has_attribute
-  /*
-   * It's a macro, so you can check whether it's defined to check
-   * whether it's supported.
-   *
-   * If it's not, define it to always return 0, so that we move on to
-   * the fallback checks.
-   */
-  #define __has_attribute(x) 0
+/*
+ * It's a macro, so you can check whether it's defined to check
+ * whether it's supported.
+ *
+ * If it's not, define it to always return 0, so that we move on to
+ * the fallback checks.
+ */
+#define __has_attribute(x) 0
 #endif
 
 /*
@@ -79,12 +79,11 @@
  * later release.
  */
 
-#if ! defined(__GNUC__)
+#if !defined(__GNUC__)
 #define PCAP_IS_AT_LEAST_GNUC_VERSION(major, minor) 0
 #else
-#define PCAP_IS_AT_LEAST_GNUC_VERSION(major, minor) \
-	(__GNUC__ > (major) || \
-	 (__GNUC__ == (major) && __GNUC_MINOR__ >= (minor)))
+#define PCAP_IS_AT_LEAST_GNUC_VERSION(major, minor)                            \
+  (__GNUC__ > (major) || (__GNUC__ == (major) && __GNUC_MINOR__ >= (minor)))
 #endif
 
 /*
@@ -94,9 +93,9 @@
 #if !defined(__clang__)
 #define PCAP_IS_AT_LEAST_CLANG_VERSION(major, minor) 0
 #else
-#define PCAP_IS_AT_LEAST_CLANG_VERSION(major, minor) \
-	(__clang_major__ > (major) || \
-	 (__clang_major__ == (major) && __clang_minor__ >= (minor)))
+#define PCAP_IS_AT_LEAST_CLANG_VERSION(major, minor)                           \
+  (__clang_major__ > (major) ||                                                \
+   (__clang_major__ == (major) && __clang_minor__ >= (minor)))
 #endif
 
 /*
@@ -117,15 +116,15 @@
  * 12.x product releases.
  */
 
-#if ! defined(__SUNPRO_C)
-#define PCAP_IS_AT_LEAST_SUNC_VERSION(major,minor) 0
+#if !defined(__SUNPRO_C)
+#define PCAP_IS_AT_LEAST_SUNC_VERSION(major, minor) 0
 #else
-#define PCAP_SUNPRO_VERSION_TO_BCD(major, minor) \
-	(((minor) >= 10) ? \
-	    (((major) << 12) | (((minor)/10) << 8) | (((minor)%10) << 4)) : \
-	    (((major) << 8) | ((minor) << 4)))
-#define PCAP_IS_AT_LEAST_SUNC_VERSION(major,minor) \
-	(__SUNPRO_C >= PCAP_SUNPRO_VERSION_TO_BCD((major), (minor)))
+#define PCAP_SUNPRO_VERSION_TO_BCD(major, minor)                               \
+  (((minor) >= 10)                                                             \
+       ? (((major) << 12) | (((minor) / 10) << 8) | (((minor) % 10) << 4))     \
+       : (((major) << 8) | ((minor) << 4)))
+#define PCAP_IS_AT_LEAST_SUNC_VERSION(major, minor)                            \
+  (__SUNPRO_C >= PCAP_SUNPRO_VERSION_TO_BCD((major), (minor)))
 #endif
 
 /*
@@ -135,11 +134,11 @@
  * upper 8 bits and the minor version in the lower 8 bits.
  */
 
-#if ! defined(__xlC__)
-#define PCAP_IS_AT_LEAST_XL_C_VERSION(major,minor) 0
+#if !defined(__xlC__)
+#define PCAP_IS_AT_LEAST_XL_C_VERSION(major, minor) 0
 #else
-#define PCAP_IS_AT_LEAST_XL_C_VERSION(major, minor) \
-	(__xlC__ >= (((major) << 8) | (minor)))
+#define PCAP_IS_AT_LEAST_XL_C_VERSION(major, minor)                            \
+  (__xlC__ >= (((major) << 8) | (minor)))
 #endif
 
 /*
@@ -153,11 +152,11 @@
  * number, and add two digits of patch.)
  */
 
-#if ! defined(__HP_aCC)
-#define PCAP_IS_AT_LEAST_HP_C_VERSION(major,minor) 0
+#if !defined(__HP_aCC)
+#define PCAP_IS_AT_LEAST_HP_C_VERSION(major, minor) 0
 #else
-#define PCAP_IS_AT_LEAST_HP_C_VERSION(major,minor) \
-	(__HP_aCC >= ((major)*10000 + (minor)*100))
+#define PCAP_IS_AT_LEAST_HP_C_VERSION(major, minor)                            \
+  (__HP_aCC >= ((major)*10000 + (minor)*100))
 #endif
 
 #endif /* lib_pcap_compiler_tests_h */
