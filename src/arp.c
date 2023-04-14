@@ -128,7 +128,7 @@ void arp_in(buf_t *buf, uint8_t *src_mac) {
   // 3. update ARP entry
   map_set(&arp_table, arp_pkt->sender_ip, src_mac);
 
-  // 4. check if there is correspond arp_buf
+  // 4. check if there is corresponding arp_buf
   void *ip_buf = map_get(&arp_buf, arp_pkt->sender_ip);
 
   // send to 'sender' with MAC
@@ -139,9 +139,8 @@ void arp_in(buf_t *buf, uint8_t *src_mac) {
   }
 
   // check if we need to response self MAC
-  if (arp_pkt->pro_type16 == swap16(ARP_REQUEST) &&
-      memcmp(arp_pkt->target_ip, net_if_ip, NET_IP_LEN * sizeof(uint8_t)) ==
-          0) {
+  if (arp_pkt->opcode16 == swap16(ARP_REQUEST) &&
+      memcmp(arp_pkt->target_ip, net_if_ip, NET_IP_LEN) == 0) {
     arp_resp(arp_pkt->sender_ip, src_mac);
   }
 }
