@@ -55,7 +55,24 @@ void arp_print() {
  * @param target_ip 想要知道的目标的ip地址
  */
 void arp_req(uint8_t *target_ip) {
-  // TO-DO
+  // 1. init txbuf
+  buf_init(&txbuf, sizeof(arp_pkt_t));
+
+  // 2. fill up ARP header
+  arp_pkt_t arp_pkt = arp_init_pkt;
+  arp_pkt.hw_type16 = swap16(ARP_HW_ETHER);
+  arp_pkt.pro_type16 = swap16(NET_PROTOCOL_IP);
+  arp_pkt.hw_len = NET_MAC_LEN;
+  arp_pkt.pro_len = NET_IP_LEN;
+  arp_pkt.opcode16 = swap16(ARP_REQUEST);
+  memcpy(arp_pkt.sender_mac, net_if_mac, NET_MAC_LEN);
+  memcpy(arp_pkt.sender_ip, net_if_ip, NET_IP_LEN);
+  memcpy(arp_pkt.target_ip, target_ip, NET_IP_LEN);
+
+  memcpy(txbuf.data, &arp_pkt, sizeof(arp_pkt_t));
+
+  // 3. send out ARP packet with broadcast address
+  ethernet_out(&txbuf, ether_broadcast_mac, NET_PROTOCOL_ARP);
 }
 
 /**
