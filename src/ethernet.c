@@ -3,12 +3,26 @@
 #include "driver.h"
 #include "ip.h"
 #include "utils.h"
+#include <assert.h>
 /**
  * @brief 处理一个收到的数据包
  *
  * @param buf 要处理的数据包
  */
-void ethernet_in(buf_t *buf) {}
+void ethernet_in(buf_t *buf) {
+  // 1. check length
+  if (buf->len < sizeof(ether_hdr_t)) {
+    return;
+  }
+
+  // 2. remove ethernet header
+  ether_hdr_t *hdr = (ether_hdr_t *)buf->data;
+  buf_remove_header(buf, sizeof(ether_hdr_t));
+
+  // 3. transport 'payload' to upper layer
+  net_in(buf, swap16(hdr->protocol16), hdr->src);
+}
+
 /**
  * @brief 处理一个要发送的数据包
  *
