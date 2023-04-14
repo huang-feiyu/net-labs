@@ -92,7 +92,40 @@ void arp_resp(uint8_t *target_ip, uint8_t *target_mac) {
  * @param src_mac 源mac地址
  */
 void arp_in(buf_t *buf, uint8_t *src_mac) {
-  // TO-DO
+  // 1. check length
+  if (buf->len < sizeof(arp_pkt_t)) {
+    return;
+  }
+
+  // 2. check if header is intact
+  arp_pkt_t *arp_pkt = (arp_pkt_t *)buf->data;
+  if (arp_pkt->hw_type16 != swap16(ARP_HW_ETHER) ||
+      arp_pkt->pro_type16 != swap16(NET_PROTOCOL_IP) ||
+      arp_pkt->hw_len != NET_MAC_LEN || arp_pkt->pro_len != NET_IP_LEN ||
+      (arp_pkt->opcode16 != swap16(ARP_REQUEST) &&
+       arp_pkt->opcode16 != swap16(ARP_REPLY))) {
+    return;
+  }
+
+  // 3. update ARP entry
+  map_set(&arp_table, arp_pkt->sender_ip, src_mac);
+
+  // 4. check if there is correspond arp_buf
+  void *ip_buf = map_get(&arp_buf, arp_pkt->sender_ip);
+
+  // send to 'sender' with MAC
+  if (ip_buf != NULL) {
+    ethernet_out(ip_buf, src_mac, NET_PROTOCOL_IP);
+    map_delete(&arp_buf, arp_pkt->sender_ip);
+    return;
+  }
+
+  // check if we need to response self MAC
+  if (arp_pkt->pro_type16 == swap16(ARP_REQUEST) &&
+      memcmp(arp_pkt->target_ip, net_if_ip, NET_IP_LEN * sizeof(uint8_t)) ==
+          0) {
+    arp_resp(arp_pkt->sender_ip, src_mac);
+  }
 }
 
 /**
@@ -113,8 +146,7 @@ void arp_out(buf_t *buf, uint8_t *ip) {
   }
 
   // 3. check is there a packet
-  void *pkt = map_get(&arp_buf, ip);
-  if (pkt == NULL) {
+  if (map_get(&arp_buf, ip) == NULL) {
     map_set(&arp_buf, ip, buf);
     arp_req(ip);
   }
