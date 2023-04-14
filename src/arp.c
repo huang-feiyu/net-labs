@@ -103,7 +103,21 @@ void arp_in(buf_t *buf, uint8_t *src_mac) {
  * @param protocol 上层协议
  */
 void arp_out(buf_t *buf, uint8_t *ip) {
-  // TO-DO
+  // 1. search in arp_table
+  void *mac = map_get(&arp_table, ip);
+
+  // 2. check entry
+  if (mac != NULL) {
+    ethernet_out(buf, mac, NET_PROTOCOL_IP);
+    return;
+  }
+
+  // 3. check is there a packet
+  void *pkt = map_get(&arp_buf, ip);
+  if (pkt == NULL) {
+    map_set(&arp_buf, ip, buf);
+    arp_req(ip);
+  }
 }
 
 /**
