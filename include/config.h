@@ -16,7 +16,7 @@
   { 0x11, 0x22, 0x33, 0x44, 0x55, 0x66 } // 测试用网卡mac地址
 #else
 #define NET_IF_IP                                                              \
-  { XX, XX, XX, XX } // 自定义网卡ip地址
+  { 0xc0, 0xa8, 0x6e, 0x81 } // 自定义网卡ip地址
 #define NET_IF_MAC                                                             \
   { 0x00, 0x11, 0x22, 0x33, 0x44, 0x55 } // 自定义网卡mac地址
 #endif

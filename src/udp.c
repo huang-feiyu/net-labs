@@ -17,7 +17,41 @@ map_t udp_table;
  * @return uint16_t 伪校验和
  */
 static uint16_t udp_checksum(buf_t *buf, uint8_t *src_ip, uint8_t *dst_ip) {
-  // TO-DO
+  buf_add_header(buf, sizeof(ip_hdr_t));
+
+  // 1. Construct header
+  ip_hdr_t ip_hdr;
+  memcpy(&ip_hdr, buf->data, sizeof(ip_hdr_t));
+  buf_remove_header(buf, sizeof(ip_hdr_t) - sizeof(udp_peso_hdr_t));
+
+  udp_peso_hdr_t udp_peso_hdr;
+  memcpy(udp_peso_hdr.src_ip, src_ip, NET_IP_LEN);
+  memcpy(udp_peso_hdr.dst_ip, dst_ip, NET_IP_LEN);
+  udp_peso_hdr.placeholder = 0;
+  udp_peso_hdr.protocol = NET_PROTOCOL_UDP;
+  udp_peso_hdr.total_len16 = swap16(buf->len - sizeof(udp_peso_hdr_t));
+  memcpy(buf->data, &udp_peso_hdr, sizeof(udp_peso_hdr_t));
+
+  int paddled = 0;
+  if (buf->len % 2) {
+    buf_add_padding(buf, 1);
+    paddled = 1;
+  }
+
+  // 2. Compute checksum
+  uint16_t checksum = checksum16((uint16_t *) buf->data, buf->len);
+
+  // 3. Restore IP
+  buf_add_header(buf, sizeof(udp_hdr_t));
+  memcpy(buf->data, &ip_hdr, sizeof(ip_hdr_t));
+  buf_remove_header(buf, sizeof(ip_hdr_t));
+
+  // 4. Remove header
+  if (paddled) {
+    buf_remove_padding(buf, 1);
+  }
+
+  return checksum;
 }
 
 /**
@@ -27,7 +61,33 @@ static uint16_t udp_checksum(buf_t *buf, uint8_t *src_ip, uint8_t *dst_ip) {
  * @param src_ip 源ip地址
  */
 void udp_in(buf_t *buf, uint8_t *src_ip) {
-  // TO-DO
+  // 1. Check length and checksum
+  if (buf->len < sizeof(udp_hdr_t)) {
+    return;
+  }
+  udp_hdr_t *udp_hdr = (udp_hdr_t *) buf->data;
+
+  uint16_t checksum16 = udp_hdr->checksum16;
+  udp_hdr->checksum16 = 0;
+  if (checksum16 != udp_checksum(buf, src_ip, net_if_ip)) {
+    return;
+  }
+  udp_hdr->checksum16 = checksum16;
+
+  // 2. Find callback function
+  uint16_t dst_port16 = swap16(udp_hdr->dst_port16);
+  udp_handler_t *handler = map_get(&udp_table, &dst_port16);
+
+  // 3. If there is not, add header and return ICMP unreachable
+  if (handler == NULL) {
+    buf_add_header(buf, sizeof(ip_hdr_t));
+    icmp_unreachable(buf, src_ip, ICMP_CODE_PORT_UNREACH);
+    return;
+  }
+
+  // 4. Otherwise, remove header and call callback function
+  buf_remove_header(buf, sizeof(udp_hdr_t));
+  (*handler)(buf->data, buf->len, src_ip, udp_hdr->src_port16);
 }
 
 /**
@@ -38,9 +98,22 @@ void udp_in(buf_t *buf, uint8_t *src_ip) {
  * @param dst_ip 目的ip地址
  * @param dst_port 目的端口号
  */
-void udp_out(buf_t *buf, uint16_t src_port, uint8_t *dst_ip,
-             uint16_t dst_port) {
-  // TO-DO
+void udp_out(buf_t *buf, uint16_t src_port, uint8_t *dst_ip, uint16_t dst_port) {
+  // 1. Construct header & fill up it
+  buf_add_header(buf, sizeof(udp_hdr_t));
+  udp_hdr_t udp_hdr;
+  udp_hdr.src_port16 = swap16(src_port);
+  udp_hdr.dst_port16 = swap16(dst_port);
+  udp_hdr.total_len16 = swap16(buf->len);
+  udp_hdr.checksum16 = 0;
+
+  // 2. Compute checksum
+  memcpy(buf->data, &udp_hdr, sizeof(udp_hdr_t));
+  udp_hdr.checksum16 = udp_checksum(buf, net_if_ip, dst_ip);
+  memcpy(buf->data, &udp_hdr, sizeof(udp_hdr_t));
+
+  // 3. Send out via IP
+  ip_out(buf, dst_ip, NET_PROTOCOL_UDP);
 }
 
 /**
@@ -79,8 +152,7 @@ void udp_close(uint16_t port) { map_delete(&udp_table, &port); }
  * @param dst_ip 目的ip地址
  * @param dst_port 目的端口号
  */
-void udp_send(uint8_t *data, uint16_t len, uint16_t src_port, uint8_t *dst_ip,
-              uint16_t dst_port) {
+void udp_send(uint8_t *data, uint16_t len, uint16_t src_port, uint8_t *dst_ip, uint16_t dst_port) {
   buf_init(&txbuf, len);
   memcpy(txbuf.data, data, len);
   udp_out(&txbuf, src_port, dst_ip, dst_port);
