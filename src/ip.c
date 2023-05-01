@@ -43,9 +43,6 @@ void ip_in(buf_t *buf, uint8_t *src_mac) {
   }
 
   // 6. Remove header
-  buf_remove_header(buf, ip_hdr->hdr_len * IP_HDR_LEN_PER_BYTE);
-
-  // 7. Transfer to above as well as check whether can handle with the protocol
   uint8_t src_ip[NET_IP_LEN];
   memcpy(src_ip, ip_hdr->src_ip, NET_IP_LEN);
   uint8_t protocol = ip_hdr->protocol;
@@ -53,6 +50,9 @@ void ip_in(buf_t *buf, uint8_t *src_mac) {
     icmp_unreachable(buf, src_ip, ICMP_CODE_PROTOCOL_UNREACH);
     return;
   }
+  buf_remove_header(buf, ip_hdr->hdr_len * IP_HDR_LEN_PER_BYTE);
+
+  // 7. Transfer to above as well as check whether can handle with the protocol
   net_in(buf, protocol, src_ip);
 }
 
