@@ -73,5 +73,26 @@ uint8_t ip_prefix_match(uint8_t *ipa, uint8_t *ipb) {
  * @return uint16_t 校验和
  */
 uint16_t checksum16(uint16_t *data, size_t len) {
-  // TO-DO
+  // Code from: https://cse.usf.edu/~kchriste/tools/checksum.c
+  uint32_t sum = 0;
+
+  // Main summing loop
+  while (len > 1) {
+    sum += *data++;
+    len -= 2;
+    while (sum >> 16) {
+      sum = (sum >> 16) + (sum & 0xffff);
+    }
+  }
+
+  // Add left-over byte, if any
+  if (len) {
+    sum += *(uint8_t *) data;
+  }
+  // Fold 32-bit sum to 16 bits
+  while (sum >> 16) {
+    sum = (sum >> 16) + (sum & 0xffff);
+  }
+
+  return (uint16_t) ~sum;
 }
