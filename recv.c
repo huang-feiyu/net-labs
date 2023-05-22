@@ -1,67 +1,115 @@
+#include <arpa/inet.h>
+#include <netdb.h>
+#include <netinet/in.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
 #include <sys/socket.h>
-#include <netdb.h>
 #include <unistd.h>
 
 #define MAX_SIZE 65535
 
-char buf[MAX_SIZE+1];
+#define swap16(x) ((((x)&0xFF) << 8) | (((x) >> 8) & 0xFF))
 
-void recv_mail()
-{
-    const char* host_name = ""; // TODO: Specify the mail server domain name
-    const unsigned short port = 110; // POP3 server port
-    const char* user = ""; // TODO: Specify the user
-    const char* pass = ""; // TODO: Specify the password
-    char dest_ip[16];
-    int s_fd; // socket file descriptor
-    struct hostent *host;
-    struct in_addr **addr_list;
-    int i = 0;
-    int r_size;
+char buf[MAX_SIZE + 1];
 
-    // Get IP from domain name
-    if ((host = gethostbyname(host_name)) == NULL)
-    {
-        herror("gethostbyname");
-        exit(EXIT_FAILURE);
-    }
-
-    addr_list = (struct in_addr **) host->h_addr_list;
-    while (addr_list[i] != NULL)
-        ++i;
-    strcpy(dest_ip, inet_ntoa(*addr_list[i-1]));
-
-    // TODO: Create a socket,return the file descriptor to s_fd, and establish a TCP connection to the POP3 server
-
-    // Print welcome message
-    if ((r_size = recv(s_fd, buf, MAX_SIZE, 0)) == -1)
-    {
-        perror("recv");
-        exit(EXIT_FAILURE);
-    }
-    buf[r_size] = '\0'; // Do not forget the null terminator
-    printf("%s", buf);
-
-    // TODO: Send user and password and print server response
-
-    // TODO: Send STAT command and print server response
-
-    // TODO: Send LIST command and print server response
-
-    // TODO: Retrieve the first mail and print its content
-
-    // TODO: Send QUIT command and print server response
-
-    close(s_fd);
+int send_wrapper(int sockfd, void *buf, int len, int flags, char *error_msg) {
+  int ret = -1;
+  if ((ret = send(sockfd, buf, len, flags)) == -1) {
+    perror(error_msg);
+    exit(EXIT_FAILURE);
+  }
+  printf("\033[1;32m%s\033[0m", (char *)buf);
+  return ret;
 }
 
-int main(int argc, char* argv[])
-{
-    recv_mail();
-    exit(0);
+int recv_wrapper(int sockfd, void *buf, int len, int flags, char *error_msg) {
+  int r_size = -1;
+  if ((r_size = recv(sockfd, buf, len, 0)) == -1) {
+    perror(error_msg);
+    exit(EXIT_FAILURE);
+  }
+  char *tmpbuf = (char *)buf;
+  tmpbuf[r_size] = '\0';
+  printf("%s", tmpbuf);
+  return r_size;
+}
+
+void recv_mail() {
+  const char *host_name = "pop.qq.com";  // TODO: Specify the mail server domain name
+  const unsigned short port = 110;       // POP3 server port
+  const char *user = "xxx@qq.com";       // TODO: Specify the user
+  const char *pass = "xxx";              // TODO: Specify the password
+  char dest_ip[16];
+  int s_fd;  // socket file descriptor
+  struct hostent *host;
+  struct in_addr **addr_list;
+  int i = 0;
+  int r_size;
+
+  // Get IP from domain name
+  if ((host = gethostbyname(host_name)) == NULL) {
+    herror("gethostbyname");
+    exit(EXIT_FAILURE);
+  }
+
+  addr_list = (struct in_addr **)host->h_addr_list;
+  while (addr_list[i] != NULL)
+    ++i;
+  strcpy(dest_ip, inet_ntoa(*addr_list[i - 1]));
+
+  // Create a socket,return the file descriptor to s_fd, and establish a TCP connection to the POP3 server
+  if ((s_fd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
+    perror("socket");
+    exit(EXIT_FAILURE);
+  }
+  struct sockaddr_in *servaddr = (struct sockaddr_in *)malloc(sizeof(struct sockaddr_in));
+  servaddr->sin_family = AF_INET;
+  servaddr->sin_port = swap16(port);
+  servaddr->sin_addr = (struct in_addr){inet_addr(dest_ip)};
+  bzero(servaddr->sin_zero, 8);
+  connect(s_fd, (struct sockaddr *)servaddr, sizeof(struct sockaddr_in));
+
+  // Print welcome message
+  recv_wrapper(s_fd, buf, MAX_SIZE, 0, "recv");
+
+  // Send user and password and print server response
+  sprintf(buf, "USER %s\r\n", user);
+  send_wrapper(s_fd, buf, strlen(buf), 0, "send USER");
+  recv_wrapper(s_fd, buf, MAX_SIZE, 0, "recv USER");
+
+  sprintf(buf, "PASS %s\r\n", pass);
+  send_wrapper(s_fd, buf, strlen(buf), 0, "send PASS");
+  recv_wrapper(s_fd, buf, MAX_SIZE, 0, "recv PASS");
+
+  // Send STAT command and print server response
+  send_wrapper(s_fd, "STAT\r\n", 6, 0, "send STAT");
+  recv_wrapper(s_fd, buf, MAX_SIZE, 0, "recv STAT");
+  int mail_num = -1, mail_tot_size = -1;
+  sscanf(buf, "+OK %d %d", &mail_num, &mail_tot_size);
+
+  // Send LIST command and print server response
+  send_wrapper(s_fd, "LIST\r\n", 6, 0, "send LIST");
+  recv_wrapper(s_fd, buf, MAX_SIZE, 0, "recv LIST");
+
+  // Retrieve the first mail and print its content
+  send_wrapper(s_fd, "RETR 1\r\n", 8, 0, "send RETR");
+  r_size = recv_wrapper(s_fd, buf, MAX_SIZE, 0, "recv RETR");
+  int total_size = atoi(buf + 4);
+  total_size -= r_size;
+  while (total_size > 0) {
+    r_size = recv_wrapper(s_fd, buf, MAX_SIZE, 0, "recv RETR");
+    total_size -= r_size;
+  }
+
+  // Send QUIT command and print server response
+  send_wrapper(s_fd, "QUIT\r\n", 6, 0, "send QUIT");
+  recv_wrapper(s_fd, buf, MAX_SIZE, 0, "recv QUIT");
+
+  close(s_fd);
+}
+
+int main(int argc, char *argv[]) {
+  recv_mail();
+  exit(0);
 }
